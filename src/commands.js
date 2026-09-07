@@ -84,7 +84,11 @@ export const commands = [
       .addStringOption((option) => option.setName('emoji').setDescription('Paste a server emoji, such as <:rare:123>.').setRequired(true).setMaxLength(100)))
     .addSubcommand((subcommand) => subcommand
       .setName('pool')
-      .setDescription('View all skills in the hidden pool, grouped by category.'))
+      .setDescription('View the hidden pool, grouped by category and optionally filtered by rarity.')
+      .addStringOption((option) => option
+        .setName('rarity')
+        .setDescription('Only show skills of this rarity.')
+        .addChoices(...rarityChoices)))
   ,
   new SlashCommandBuilder()
     .setName('profile')
