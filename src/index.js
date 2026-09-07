@@ -167,12 +167,24 @@ function talentPoolEmbed(talents, customEmojis = {}, requestedPage = 0, rarity =
 
 function talentPoolControls(page, talentCount, rarity = null) {
   const pageCount = Math.max(1, Math.ceil(talentCount / TALENTS_PER_POOL_PAGE));
-  if (pageCount === 1) return [];
   const filter = rarity ?? 'all';
-  return [new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`talent-pool-page:${filter}:${page - 1}`).setLabel('Previous').setStyle(ButtonStyle.Secondary).setDisabled(page <= 0),
-    new ButtonBuilder().setCustomId(`talent-pool-page:${filter}:${page + 1}`).setLabel('Next').setStyle(ButtonStyle.Primary).setDisabled(page >= pageCount - 1),
-  )];
+  const rows = [];
+  if (pageCount > 1) {
+    rows.push(new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`talent-pool-page:${filter}:${page - 1}`).setLabel('Previous').setStyle(ButtonStyle.Secondary).setDisabled(page <= 0),
+      new ButtonBuilder().setCustomId(`talent-pool-page:${filter}:${page + 1}`).setLabel('Next').setStyle(ButtonStyle.Primary).setDisabled(page >= pageCount - 1),
+    ));
+  }
+  rows.push(new ActionRowBuilder().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId('talent-pool-filter')
+      .setPlaceholder('Filter the skill pool by rarity')
+      .addOptions([
+        { label: 'All Skills', value: 'all', default: filter === 'all' },
+        ...Object.entries(rarityStyle).map(([value, style]) => ({ label: style.label, value, default: filter === value })),
+      ]),
+  ));
+  return rows;
 }
 
 function isAdmin(interaction) {
@@ -204,6 +216,15 @@ client.on(Events.InteractionCreate, async (interaction) => {
       if (!canManageTalentCard(interaction, memberId)) return interaction.reply({ content: 'Only this profile’s owner or an administrator can manage this skill card.', ephemeral: true });
       cardSelections.set(interaction.message.id, interaction.values[0]);
       return interaction.reply({ content: 'Skill selected. Choose **Save**, **Burn**, or **Freeze** below.', ephemeral: true });
+    }
+
+    if (interaction.isStringSelectMenu() && interaction.customId === 'talent-pool-filter') {
+      if (!isAdmin(interaction)) return interaction.reply({ content: 'Only server administrators can view the skill pool.', ephemeral: true });
+      const selected = interaction.values[0] ?? 'all';
+      const rarity = selected === 'all' ? null : selected;
+      const [allTalents, customEmojis] = await Promise.all([getTalents(), getRarityEmojis(interaction.guildId)]);
+      const talents = rarity ? allTalents.filter((talent) => talent.rarity === rarity) : allTalents;
+      return interaction.update({ embeds: [talentPoolEmbed(talents, customEmojis, 0, rarity)], components: talentPoolControls(0, talents.length, rarity) });
     }
 
     if (interaction.isButton() && interaction.customId.startsWith('talent-pool-page:')) {
