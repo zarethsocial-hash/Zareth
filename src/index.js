@@ -152,24 +152,26 @@ function profileEmbed(member, profile, talents, customEmojis = {}) {
     .setColor(colors[highestRarity] ?? 0x5865f2);
 }
 
-function talentPoolEmbed(talents, customEmojis = {}, requestedPage = 0) {
+function talentPoolEmbed(talents, customEmojis = {}, requestedPage = 0, rarity = null) {
   const pageCount = Math.max(1, Math.ceil(talents.length / TALENTS_PER_POOL_PAGE));
   const page = Math.min(Math.max(0, requestedPage), pageCount - 1);
   const pageTalents = talents.slice(page * TALENTS_PER_POOL_PAGE, (page + 1) * TALENTS_PER_POOL_PAGE);
   const description = formatTalentGroups(pageTalents, customEmojis, (talent) => talent, (talent) => ` • weight \`${talent.weight}\`\n${talentDescription(talent.description)}`);
+  const filterLabel = rarity ? ` • ${rarityStyle(rarity).name}` : '';
   return new EmbedBuilder()
     .setTitle(mainHeader('𝗦𝗞𝗜𝗟𝗟 𝗣𝗢𝗢𝗟'))
     .setDescription(description || '*The pool is empty.*')
     .setColor(0x5865f2)
-    .setFooter({ text: `${talents.length} total skills • Page ${page + 1}/${pageCount} • Admin only` });
+    .setFooter({ text: `${talents.length} skill${talents.length === 1 ? '' : 's'}${filterLabel} • Page ${page + 1}/${pageCount} • Admin only` });
 }
 
-function talentPoolControls(page, talentCount) {
+function talentPoolControls(page, talentCount, rarity = null) {
   const pageCount = Math.max(1, Math.ceil(talentCount / TALENTS_PER_POOL_PAGE));
   if (pageCount === 1) return [];
+  const filter = rarity ?? 'all';
   return [new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`talent-pool-page:${page - 1}`).setLabel('Previous').setStyle(ButtonStyle.Secondary).setDisabled(page <= 0),
-    new ButtonBuilder().setCustomId(`talent-pool-page:${page + 1}`).setLabel('Next').setStyle(ButtonStyle.Primary).setDisabled(page >= pageCount - 1),
+    new ButtonBuilder().setCustomId(`talent-pool-page:${filter}:${page - 1}`).setLabel('Previous').setStyle(ButtonStyle.Secondary).setDisabled(page <= 0),
+    new ButtonBuilder().setCustomId(`talent-pool-page:${filter}:${page + 1}`).setLabel('Next').setStyle(ButtonStyle.Primary).setDisabled(page >= pageCount - 1),
   )];
 }
 
@@ -206,11 +208,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     if (interaction.isButton() && interaction.customId.startsWith('talent-pool-page:')) {
       if (!isAdmin(interaction)) return interaction.reply({ content: 'Only server administrators can view the skill pool.', ephemeral: true });
-      const requestedPage = Number(interaction.customId.split(':')[1]);
-      const [talents, customEmojis] = await Promise.all([getTalents(), getRarityEmojis(interaction.guildId)]);
+      const [, , filter = 'all', rawPage] = interaction.customId.split(':');
+      const requestedPage = Number(rawPage ?? filter);
+      const rarity = rawPage && filter !== 'all' ? filter : null;
+      const [allTalents, customEmojis] = await Promise.all([getTalents(), getRarityEmojis(interaction.guildId)]);
+      const talents = rarity ? allTalents.filter((talent) => talent.rarity === rarity) : allTalents;
       const pageCount = Math.max(1, Math.ceil(talents.length / TALENTS_PER_POOL_PAGE));
       const page = Math.min(Math.max(0, Number.isInteger(requestedPage) ? requestedPage : 0), pageCount - 1);
-      return interaction.update({ embeds: [talentPoolEmbed(talents, customEmojis, page)], components: talentPoolControls(page, talents.length) });
+      return interaction.update({ embeds: [talentPoolEmbed(talents, customEmojis, page, rarity)], components: talentPoolControls(page, talents.length, rarity) });
     }
 
     if (interaction.isButton() && interaction.customId.startsWith('talent-act:')) {
@@ -365,8 +370,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return interaction.reply({ content: `Set ${rarity} skill embeds to use ${emoji}.`, ephemeral: true });
       }
       if (action === 'pool') {
-        const [talents, customEmojis] = await Promise.all([getTalents(), getRarityEmojis(interaction.guildId)]);
-        return interaction.reply({ embeds: [talentPoolEmbed(talents, customEmojis, 0)], components: talentPoolControls(0, talents.length), ephemeral: true });
+        const rarity = interaction.options.getString('rarity');
+        const [allTalents, customEmojis] = await Promise.all([getTalents(), getRarityEmojis(interaction.guildId)]);
+        const talents = rarity ? allTalents.filter((talent) => talent.rarity === rarity) : allTalents;
+        return interaction.reply({ embeds: [talentPoolEmbed(talents, customEmojis, 0, rarity)], components: talentPoolControls(0, talents.length, rarity), ephemeral: true });
       }
       const member = interaction.options.getUser('member', true);
       const cleared = await clearAssignment(interaction.guildId, member.id);
