@@ -157,7 +157,7 @@ function talentPoolEmbed(talents, customEmojis = {}, requestedPage = 0, rarity =
   const page = Math.min(Math.max(0, requestedPage), pageCount - 1);
   const pageTalents = talents.slice(page * TALENTS_PER_POOL_PAGE, (page + 1) * TALENTS_PER_POOL_PAGE);
   const description = formatTalentGroups(pageTalents, customEmojis, (talent) => talent, (talent) => ` • weight \`${talent.weight}\`\n${talentDescription(talent.description)}`);
-  const filterLabel = rarity ? ` • ${rarityStyle(rarity).name}` : '';
+  const filterLabel = rarity ? ` • ${(rarityStyle[rarity] ?? rarityStyle.common).label}` : '';
   return new EmbedBuilder()
     .setTitle(mainHeader('𝗦𝗞𝗜𝗟𝗟 𝗣𝗢𝗢𝗟'))
     .setDescription(description || '*The pool is empty.*')
