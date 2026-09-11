@@ -256,3 +256,17 @@ export async function clearAssignment(guildId, userId) {
   await writeJson(assignmentFile, assignments);
   return true;
 }
+
+export async function removeAssignment(guildId, userId, name) {
+  const assignments = await ensureDataFile(assignmentFile, {});
+  const existing = assignments?.[guildId]?.[userId];
+  if (!existing) return null;
+  const skills = Array.isArray(existing) ? existing : [existing];
+  const index = skills.findIndex((skill) => skill.name.toLowerCase() === name.toLowerCase());
+  if (index === -1) return null;
+  const [removed] = skills.splice(index, 1);
+  if (skills.length === 0) delete assignments[guildId][userId];
+  else assignments[guildId][userId] = skills;
+  await writeJson(assignmentFile, assignments);
+  return removed;
+}
