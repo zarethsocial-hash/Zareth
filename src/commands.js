@@ -63,6 +63,11 @@ export const commands = [
       .addUserOption((option) => option.setName('member').setDescription('Member receiving the skill.').setRequired(true))
       .addStringOption((option) => option.setName('name').setDescription('Exact name of a skill in the pool.').setRequired(true)))
     .addSubcommand((subcommand) => subcommand
+      .setName('revoke')
+      .setDescription('Remove one specific saved skill from a member.')
+      .addUserOption((option) => option.setName('member').setDescription('Member losing the skill.').setRequired(true))
+      .addStringOption((option) => option.setName('name').setDescription('Exact saved skill name to remove.').setRequired(true)))
+    .addSubcommand((subcommand) => subcommand
       .setName('clear')
       .setDescription('Clear all skills earned by a member.')
       .addUserOption((option) => option.setName('member').setDescription('Member whose skills to clear.').setRequired(true)))
