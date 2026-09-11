@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, Client, EmbedBuilder, Events, GatewayIntentBits, PermissionFlagsBits, StringSelectMenuBuilder } from 'discord.js';
 import { commands } from './commands.js';
-import { addAssignments, addPendingTalents, addTalent, clearAssignment, consumeRarityBoost, getAssignment, getBatchSavedCount, getBurnedTalents, getPendingTalents, getProfile, getRarityEmojis, getTalents, grantRarityBoost, recordBatchSave, removeTalent, resolvePendingTalent, setProfile, setRarityEmoji, updateTalent, weightedRoll } from './talents.js';
+import { addAssignments, addPendingTalents, addTalent, clearAssignment, consumeRarityBoost, getAssignment, getBatchSavedCount, getBurnedTalents, getPendingTalents, getProfile, getRarityEmojis, getTalents, grantRarityBoost, recordBatchSave, removeAssignment, removeTalent, resolvePendingTalent, setProfile, setRarityEmoji, updateTalent, weightedRoll } from './talents.js';
 
 const token = process.env.DISCORD_TOKEN;
 if (!token) throw new Error('DISCORD_TOKEN is missing. Copy .env.example to .env and add your bot token.');
@@ -377,6 +377,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
         if (!skill) return interaction.reply({ content: `No pool skill named **${name}** exists. Use \`/skill-admin pool\` to check the exact name.`, ephemeral: true });
         await addAssignments(interaction.guildId, member.id, [skill]);
         return interaction.reply({ content: `Granted **${skill.name}** directly to ${member.username}'s profile.`, ephemeral: true });
+      }
+      if (action === 'revoke') {
+        const member = interaction.options.getUser('member', true);
+        const removed = await removeAssignment(interaction.guildId, member.id, interaction.options.getString('name', true));
+        if (!removed) return interaction.reply({ content: `${member.username} does not have a saved skill with that exact name.`, ephemeral: true });
+        return interaction.reply({ content: `Removed one copy of **${removed.name}** from ${member.username}'s saved skills.`, ephemeral: true });
       }
       if (action === 'boost') {
         const member = interaction.options.getUser('member', true);
