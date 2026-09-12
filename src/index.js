@@ -213,6 +213,17 @@ client.once(Events.ClientReady, async (readyClient) => {
 client.on(Events.InteractionCreate, async (interaction) => {
   if (!interaction.guildId) return;
   try {
+    if (interaction.isAutocomplete()) {
+      if (interaction.commandName !== 'profile-admin' || interaction.options.getFocused(true).name !== 'race') return interaction.respond([]);
+      const query = interaction.options.getFocused().toLowerCase();
+      const races = await getRaces(interaction.guildId);
+      const matches = races
+        .filter((race) => race.toLowerCase().includes(query))
+        .slice(0, 25)
+        .map((race) => ({ name: race, value: race }));
+      return interaction.respond(matches);
+    }
+
     if (interaction.isStringSelectMenu() && interaction.customId.startsWith('talent-pick:')) {
       const [, memberId] = interaction.customId.split(':');
       if (!canManageTalentCard(interaction, memberId)) return interaction.reply({ content: 'Only this profile’s owner or an administrator can manage this skill card.', ephemeral: true });
