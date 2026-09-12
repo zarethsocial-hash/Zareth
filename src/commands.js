@@ -44,7 +44,9 @@ export const commands = [
         .addChoices(...rarityChoices))
       .addIntegerOption((option) => option.setName('weight').setDescription('Relative roll chance; higher is more common.').setRequired(true).setMinValue(1).setMaxValue(100000))
       .addStringOption((option) => option.setName('description').setDescription('What the skill does.').setRequired(true).setMaxLength(1000))
-      .addStringOption((option) => option.setName('category').setDescription('Skill category (default: Innate).').setMaxLength(40)))
+      .addStringOption((option) => option.setName('category').setDescription('Skill category (default: Innate).').setMaxLength(40))
+      .addIntegerOption((option) => option.setName('min_tier').setDescription('Lowest character tier allowed to roll it.').setMinValue(1).setMaxValue(5))
+      .addStringOption((option) => option.setName('races').setDescription('Allowed races, comma-separated; use all for no restriction.').setMaxLength(300)))
     .addSubcommand((subcommand) => subcommand
       .setName('remove')
       .setDescription('Remove a skill from the RNG pool.')
@@ -56,7 +58,9 @@ export const commands = [
       .addStringOption((option) => option.setName('new_name').setDescription('New skill name.').setMaxLength(80))
       .addStringOption((option) => option.setName('rarity').setDescription('New rarity.')
         .addChoices(...rarityChoices))
-      .addStringOption((option) => option.setName('description').setDescription('New skill description.').setMaxLength(1000)))
+      .addStringOption((option) => option.setName('description').setDescription('New skill description.').setMaxLength(1000))
+      .addIntegerOption((option) => option.setName('min_tier').setDescription('New lowest character tier.').setMinValue(1).setMaxValue(5))
+      .addStringOption((option) => option.setName('races').setDescription('New allowed races; use all to clear a restriction.').setMaxLength(300)))
     .addSubcommand((subcommand) => subcommand
       .setName('grant')
       .setDescription('Give a specific pool skill directly to a member.')
@@ -96,6 +100,19 @@ export const commands = [
         .addChoices(...rarityChoices)))
   ,
   new SlashCommandBuilder()
+    .setName('race-admin')
+    .setDescription('Manage the selectable character races.')
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+    .addSubcommand((subcommand) => subcommand
+      .setName('add')
+      .setDescription('Add a selectable race.')
+      .addStringOption((option) => option.setName('name').setDescription('Race name.').setRequired(true).setMaxLength(60)))
+    .addSubcommand((subcommand) => subcommand
+      .setName('remove')
+      .setDescription('Remove a selectable race.')
+      .addStringOption((option) => option.setName('name').setDescription('Exact race name.').setRequired(true).setMaxLength(60)))
+    .addSubcommand((subcommand) => subcommand.setName('list').setDescription('View selectable races.')),
+  new SlashCommandBuilder()
     .setName('profile')
     .setDescription('View a roleplay profile.')
     .addSubcommand((subcommand) => subcommand
@@ -112,6 +129,6 @@ export const commands = [
       .addUserOption((option) => option.setName('member').setDescription('Member whose profile to update.').setRequired(true))
       .addStringOption((option) => option.setName('level').setDescription('Level shown on the skill card.'))
       .addStringOption((option) => option.setName('class').setDescription('Class shown on the profile.'))
-      .addStringOption((option) => option.setName('tier').setDescription('Tier shown on the skill card.'))
-      .addStringOption((option) => option.setName('race').setDescription('Race shown on the profile.')))
+      .addIntegerOption((option) => option.setName('tier').setDescription('Tier 1–5; higher tiers unlock stronger skills.').setMinValue(1).setMaxValue(5))
+      .addStringOption((option) => option.setName('race').setDescription('Search and select a canon race.').setAutocomplete(true)))
 ].map((command) => command.toJSON());
