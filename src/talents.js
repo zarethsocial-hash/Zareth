@@ -13,6 +13,28 @@ const profileFile = path.join(dataDir, 'profiles.json');
 const pendingFile = path.join(dataDir, 'pending-talents.json');
 const burnedFile = path.join(dataDir, 'burned-talents.json');
 const selectionFile = path.join(dataDir, 'roll-selections.json');
+const raceFile = path.join(dataDir, 'races.json');
+
+export const DEFAULT_RACES = [
+  'Human', 'Dwarf', 'Elf', 'High Elf', 'Beastman', 'Lizardman', 'Goblin', 'Hobgoblin',
+  'Orc', 'Ogre', 'Kijin', 'Dragonewt', 'Direwolf', 'Slime', 'Demon', 'Vampire',
+  'Angel', 'Spirit', 'Insectar', 'True Dragon', 'True Giant',
+];
+
+const defaultMinTier = { common: 1, uncommon: 2, rare: 3, epic: 4, legendary: 5 };
+const raceSkillRequirements = {
+  absorption: ['Slime'], dissolve: ['Slime'], predator: ['Slime'], selfregeneration: ['Slime', 'Vampire'],
+  beastbody: ['Beastman', 'Direwolf'], beastdomination: ['Beastman'], beastunification: ['Beastman'], beastialize: ['Beastman'],
+  bloodraise: ['Vampire'], darknightcycle: ['Vampire'], possess: ['Vampire'], charm: ['Vampire'],
+  dragonbody: ['True Dragon'], dragonchange: ['True Dragon'], dragoneye: ['True Dragon'], dragonscales: ['True Dragon'], dragonskin: ['True Dragon'], dragonspirithaki: ['True Dragon'],
+  magicnullification: ['True Giant'], pseudodragonbody: ['Dragonewt'], scalearmor: ['Dragonewt'], flamebreath: ['Dragonewt'], thunderbreath: ['Dragonewt'],
+  ultrasmell: ['Direwolf'], shadowmotion: ['Direwolf', 'Vampire'], godwolfsense: ['Direwolf'],
+  ogreberserker: ['Ogre', 'Kijin'], blackflamethunder: ['Ogre', 'Kijin'],
+  plantwhisper: ['Spirit'], universalthread: ['Insectar'], stickythread: ['Insectar'], steelthread: ['Insectar'],
+};
+
+const skillKey = (name) => name.toLowerCase().replace(/[^a-z0-9]/g, '');
+const raceKey = (name) => name.trim().toLowerCase();
 
 export const STARTER_TALENTS = [
   { name: 'Footwork Technique', category: 'Innate', rarity: 'common', weight: 32, description: 'Training in evasive movement and rapid changes of position.' },
@@ -49,7 +71,12 @@ async function writeJson(file, value) {
 
 export async function getTalents() {
   const talents = await ensureDataFile(talentFile, STARTER_TALENTS);
-  return talents.map((talent) => ({ ...talent, category: talent.category ?? defaultCategories[talent.name] ?? 'Innate' }));
+  return talents.map((talent) => ({
+    ...talent,
+    category: talent.category ?? defaultCategories[talent.name] ?? 'Innate',
+    minTier: Math.max(1, Math.min(5, Number(talent.minTier) || defaultMinTier[talent.rarity] || 1)),
+    races: Array.isArray(talent.races) ? talent.races : (raceSkillRequirements[skillKey(talent.name)] ?? []),
+  }));
 }
 
 export async function addTalent(talent) {
@@ -84,23 +111,52 @@ export async function updateTalent(name, updates) {
   return talents[index];
 }
 
-export async function weightedRoll({ milestone = false, boostLevel = 0, excludedNames = [], rarity } = {}) {
+export async function weightedRoll({ milestone = false, boostLevel = 0, excludedNames = [], rarity, race = 'Unassigned', tier = 1 } = {}) {
   const talents = await getTalents();
   const excluded = new Set(excludedNames.map((name) => name.toLowerCase()));
+  const characterTier = Math.max(1, Math.min(5, Number.parseInt(tier, 10) || 1));
+  const characterRace = raceKey(race);
   const adjustedTalents = talents.filter((talent) =>
-    !excluded.has(talent.name.toLowerCase()) && (!rarity || talent.rarity === rarity),
+    !excluded.has(talent.name.toLowerCase())
+      && (!rarity || talent.rarity === rarity)
+      && talent.minTier <= characterTier
+      && (talent.races.length === 0 || talent.races.some((allowedRace) => raceKey(allowedRace) === characterRace)),
   ).map((talent) => ({
     ...talent,
     weight: adjustedWeight(talent, milestone, boostLevel),
   }));
   const totalWeight = adjustedTalents.reduce((sum, talent) => sum + talent.weight, 0);
-  if (!totalWeight) throw new Error(rarity ? 'No unburned skills exist in that selected tier.' : 'The skill pool is empty. Add a skill before rolling.');
+  if (!totalWeight) throw new Error(`No eligible ${rarity ? `${rarity} ` : ''}skills exist for ${race} at Tier ${characterTier}.`);
   let point = randomInt(totalWeight);
   for (const talent of adjustedTalents) {
     point -= talent.weight;
     if (point < 0) return talent;
   }
   throw new Error('Could not select a talent. Check the pool weights.');
+}
+
+export async function getRaces(guildId) {
+  const races = await ensureDataFile(raceFile, {});
+  return races?.[guildId] ?? DEFAULT_RACES;
+}
+
+export async function addRace(guildId, name) {
+  const races = await ensureDataFile(raceFile, {});
+  const existing = races[guildId] ?? DEFAULT_RACES;
+  if (existing.some((race) => raceKey(race) === raceKey(name))) throw new Error('That race is already available.');
+  races[guildId] = [...existing, name.trim()];
+  await writeJson(raceFile, races);
+  return races[guildId];
+}
+
+export async function removeRace(guildId, name) {
+  const races = await ensureDataFile(raceFile, {});
+  const existing = races[guildId] ?? DEFAULT_RACES;
+  const next = existing.filter((race) => raceKey(race) !== raceKey(name));
+  if (next.length === existing.length) return false;
+  races[guildId] = next;
+  await writeJson(raceFile, races);
+  return true;
 }
 
 function adjustedWeight(talent, milestone, boostLevel) {
