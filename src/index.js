@@ -103,7 +103,7 @@ function talentCardEmbed(member, profile, collection, pendingTalents, customEmoj
   );
   return new EmbedBuilder()
     .setDescription(
-      `${mainHeader('__**𝗦𝗞𝗜𝗟𝗟 𝗖𝗔𝗥𝗗 𝗥𝗘𝗥𝗢𝗟𝗟**__')}\n\n**Member**　　　　**Level**　　　　**Tier**\n<@${member.id}>　　　　\`${profile.level}\`　　　　\`${profile.tier}\`\n\n${talentLines || '*No pending skills.*'}\n\n*Class: ${profile.class} • Saved skills: ${collection.length}*`,
+      `${mainHeader('__**𝗦𝗞𝗜𝗟𝗟 𝗖𝗔𝗥𝗗 𝗥𝗘𝗥𝗢𝗟𝗟**__')}\n\n**Member**　　　　**Level**　　　　**Tier**　　　　**Race**\n<@${member.id}>　　　　\`${profile.level}\`　　　　\`${profile.tier}\`　　　　${profile.race}\n\n${talentLines || '*No pending skills.*'}\n\n*Class: ${profile.class} • Saved skills: ${collection.length}*`,
     )
     .setColor(colors[highestRarity] ?? 0x5865f2)
     .setFooter({ text: `Highest rarity: ${topStyle.label}` });
