@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, Client, EmbedBuilder, Events, GatewayIntentBits, PermissionFlagsBits, StringSelectMenuBuilder } from 'discord.js';
 import { commands } from './commands.js';
-import { addAssignments, addPendingTalents, addTalent, clearAssignment, consumeRarityBoost, getAssignment, getBatchSavedCount, getBurnedTalents, getPendingTalents, getProfile, getRarityEmojis, getTalents, grantRarityBoost, recordBatchSave, removeAssignment, removeTalent, resolvePendingTalent, setProfile, setRarityEmoji, updateTalent, weightedRoll } from './talents.js';
+import { addAssignments, addPendingTalents, addRace, addTalent, clearAssignment, consumeRarityBoost, getAssignment, getBatchSavedCount, getBurnedTalents, getPendingTalents, getProfile, getRaces, getRarityEmojis, getTalents, grantRarityBoost, recordBatchSave, removeAssignment, removeRace, removeTalent, resolvePendingTalent, setProfile, setRarityEmoji, updateTalent, weightedRoll } from './talents.js';
 
 const token = process.env.DISCORD_TOKEN;
 if (!token) throw new Error('DISCORD_TOKEN is missing. Copy .env.example to .env and add your bot token.');
@@ -20,6 +20,8 @@ const MAX_SAVES_PER_ROLL = 2;
 const TALENTS_PER_POOL_PAGE = 10;
 const mainHeader = (text) => `<:supportgear:1546350366394945576> ${text}`;
 const talentDescription = (text) => `-# <:RA_2:1546347972411789403> ${text}`;
+const parseRaceList = (value) => !value || value.trim().toLowerCase() === 'all' ? [] : value.split(',').map((race) => race.trim()).filter(Boolean);
+const sameRace = (left, right) => left.trim().toLowerCase() === right.trim().toLowerCase();
 
 function talentEmbed(talent, title = 'Skill acquired', customEmojis = {}) {
   const style = rarityStyle[talent.rarity] ?? rarityStyle.common;
@@ -156,7 +158,7 @@ function talentPoolEmbed(talents, customEmojis = {}, requestedPage = 0, rarity =
   const pageCount = Math.max(1, Math.ceil(talents.length / TALENTS_PER_POOL_PAGE));
   const page = Math.min(Math.max(0, requestedPage), pageCount - 1);
   const pageTalents = talents.slice(page * TALENTS_PER_POOL_PAGE, (page + 1) * TALENTS_PER_POOL_PAGE);
-  const description = formatTalentGroups(pageTalents, customEmojis, (talent) => talent, (talent) => ` • weight \`${talent.weight}\`\n${talentDescription(talent.description)}`);
+  const description = formatTalentGroups(pageTalents, customEmojis, (talent) => talent, (talent) => ` • weight \`${talent.weight}\` • Tier \`${talent.minTier}\`${talent.races.length ? ` • ${talent.races.join(', ')}` : ''}\n${talentDescription(talent.description)}`);
   const filterLabel = rarity ? ` • ${(rarityStyle[rarity] ?? rarityStyle.common).label}` : '';
   return new EmbedBuilder()
     .setTitle(mainHeader('𝗦𝗞𝗜𝗟𝗟 𝗣𝗢𝗢𝗟'))
@@ -283,10 +285,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const amount = interaction.options.getInteger('amount') ?? 1;
         const requestedRarity = interaction.options.getString('rarity');
         const member = interaction.options.getUser('member') ?? interaction.user;
-        const [existingTalents, pendingBefore, burnedTalents] = await Promise.all([
+        const [existingTalents, pendingBefore, burnedTalents, profile] = await Promise.all([
           getAssignment(interaction.guildId, member.id),
           getPendingTalents(interaction.guildId, member.id),
           getBurnedTalents(interaction.guildId, member.id),
+          getProfile(interaction.guildId, member.id),
         ]);
         const boostLevel = await consumeRarityBoost(interaction.guildId, member.id);
         const spinDetails = [];
@@ -294,16 +297,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
           const talentNumber = existingTalents.length + pendingBefore.length + index + 1;
           const milestone = talentNumber % 7 === 0;
           const appliedBoost = index === 0 ? boostLevel : 0;
-          const talent = await weightedRoll({ milestone, boostLevel: appliedBoost, excludedNames: burnedTalents, rarity: requestedRarity });
+          const talent = await weightedRoll({ milestone, boostLevel: appliedBoost, excludedNames: burnedTalents, rarity: requestedRarity, race: profile.race, tier: profile.tier });
           spinDetails.push({ talent, talentNumber, milestone, boostLevel: appliedBoost });
         }
         const rolledTalents = spinDetails.map((spin) => spin.talent);
         const newEntries = await addPendingTalents(interaction.guildId, member.id, rolledTalents);
         const batchId = newEntries[0].batchId;
-        const [profile, collection] = await Promise.all([
-          getProfile(interaction.guildId, member.id),
-          getAssignment(interaction.guildId, member.id),
-        ]);
+        const collection = await getAssignment(interaction.guildId, member.id);
         const specialSpins = spinDetails
           .filter((spin) => spin.milestone || spin.boostLevel > 0)
           .map((spin) => `#${spin.talentNumber}: ${spin.milestone ? '✨ Fortune spin' : ''}${spin.milestone && spin.boostLevel ? ' + ' : ''}${spin.boostLevel ? `☘️ Rarity Boost Lv.${spin.boostLevel}` : ''}`);
@@ -334,23 +334,46 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.commandName === 'profile-admin') {
       if (!isAdmin(interaction)) return interaction.reply({ content: 'Only server administrators can set up roleplay profiles.', ephemeral: true });
       const member = interaction.options.getUser('member', true);
+      const requestedRace = interaction.options.getString('race');
+      if (requestedRace !== null) {
+        const races = await getRaces(interaction.guildId);
+        if (!races.some((race) => sameRace(race, requestedRace))) {
+          return interaction.reply({ content: `**${requestedRace}** is not a selectable race. Use \`/race-admin list\` or add it first.`, ephemeral: true });
+        }
+      }
       const updates = Object.fromEntries([
         ['level', interaction.options.getString('level')],
         ['class', interaction.options.getString('class')],
-        ['tier', interaction.options.getString('tier')],
-        ['race', interaction.options.getString('race')],
+        ['tier', interaction.options.getInteger('tier')?.toString() ?? null],
+        ['race', requestedRace],
       ].filter(([, value]) => value !== null));
       if (Object.keys(updates).length === 0) return interaction.reply({ content: 'Provide at least one value to update.', ephemeral: true });
       const profile = await setProfile(interaction.guildId, member.id, updates);
       return interaction.reply({ content: `Updated ${member.username}'s profile — Level: **${profile.level}**, Race: **${profile.race}**, Class: **${profile.class}**, Tier: **${profile.tier}**.`, ephemeral: true });
     }
 
+    if (interaction.commandName === 'race-admin') {
+      if (!isAdmin(interaction)) return interaction.reply({ content: 'Only server administrators can manage selectable races.', ephemeral: true });
+      const action = interaction.options.getSubcommand();
+      if (action === 'list') {
+        const races = await getRaces(interaction.guildId);
+        return interaction.reply({ content: `**Selectable races**\n${races.map((race) => `• ${race}`).join('\n')}`, ephemeral: true });
+      }
+      const name = interaction.options.getString('name', true);
+      if (action === 'add') {
+        await addRace(interaction.guildId, name);
+        return interaction.reply({ content: `Added **${name.trim()}** as a selectable race.`, ephemeral: true });
+      }
+      const removed = await removeRace(interaction.guildId, name);
+      return interaction.reply({ content: removed ? `Removed **${name}** from selectable races.` : `No selectable race named **${name}** exists.`, ephemeral: true });
+    }
+
     if (interaction.commandName === 'skill-admin') {
       if (!isAdmin(interaction)) return interaction.reply({ content: 'Only server administrators can manage the skill system.', ephemeral: true });
       const action = interaction.options.getSubcommand();
       if (action === 'add') {
-        const talent = await addTalent({ name: interaction.options.getString('name', true), rarity: interaction.options.getString('rarity', true), category: interaction.options.getString('category') ?? 'Innate', weight: interaction.options.getInteger('weight', true), description: interaction.options.getString('description', true) });
-        return interaction.reply({ content: `Added **${talent.name}** to the skill pool with weight ${talent.weight}.`, ephemeral: true });
+        const talent = await addTalent({ name: interaction.options.getString('name', true), rarity: interaction.options.getString('rarity', true), category: interaction.options.getString('category') ?? 'Innate', weight: interaction.options.getInteger('weight', true), description: interaction.options.getString('description', true), minTier: interaction.options.getInteger('min_tier') ?? undefined, races: parseRaceList(interaction.options.getString('races')) });
+        return interaction.reply({ content: `Added **${talent.name}** to the skill pool with weight ${talent.weight}, minimum Tier ${talent.minTier ?? 'by rarity'}, and ${talent.races?.length ? talent.races.join(', ') : 'all races'} allowed.`, ephemeral: true });
       }
       if (action === 'remove') {
         const talent = await removeTalent(interaction.options.getString('name', true));
@@ -361,10 +384,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
           name: interaction.options.getString('new_name') ?? undefined,
           rarity: interaction.options.getString('rarity') ?? undefined,
           description: interaction.options.getString('description') ?? undefined,
+          minTier: interaction.options.getInteger('min_tier') ?? undefined,
+          races: interaction.options.getString('races') === null ? undefined : parseRaceList(interaction.options.getString('races')),
         };
         Object.keys(updates).forEach((key) => updates[key] === undefined && delete updates[key]);
         if (Object.keys(updates).length === 0) {
-          return interaction.reply({ content: 'Choose at least one value to change: new name, rarity, or description.', ephemeral: true });
+          return interaction.reply({ content: 'Choose at least one value to change: new name, rarity, description, minimum tier, or races.', ephemeral: true });
         }
         const talent = await updateTalent(interaction.options.getString('name', true), updates);
         return interaction.reply({ content: `Updated **${talent.name}** in the skill pool.`, ephemeral: true });
