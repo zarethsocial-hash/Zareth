@@ -16,21 +16,26 @@ const selectionFile = path.join(dataDir, 'roll-selections.json');
 const raceFile = path.join(dataDir, 'races.json');
 
 export const DEFAULT_RACES = [
-  'Human', 'Dwarf', 'Elf', 'High Elf', 'Beastman', 'Lizardman', 'Goblin', 'Hobgoblin',
-  'Orc', 'Ogre', 'Kijin', 'Dragonewt', 'Direwolf', 'Slime', 'Demon', 'Vampire',
-  'Angel', 'Spirit', 'Insectar', 'True Dragon', 'True Giant',
+  'Human', 'Otherworlder',
+  'Elf', 'High Elf', 'Dark Elf', 'Dwarf', 'High Dwarf', 'Merfolk', 'Siren',
+  'Goblin', 'Hobgoblin', 'Goblina', 'Halfling', 'Ogre', 'Kijin', 'Enki',
+  'Lycanthrope', 'Orc', 'High Orc', 'Orc Lord', 'Lizardman', 'Dragonewt', 'True Dragonewt',
+  'Tengu', 'Okami', 'Rabbitfolk', 'Kobold',
+  'Slime', 'Demon Slime', 'Vampire', 'Daemon', 'Angel', 'Fallen Angel',
+  'Spirit', 'Dryad', 'Treant', 'Insectar', 'Dragon', 'True Dragon', 'True Giant',
+  'Cryptid (Chimera)',
 ];
 
 const defaultMinTier = { common: 1, uncommon: 2, rare: 3, epic: 4, legendary: 5 };
 const raceSkillRequirements = {
-  absorption: ['Slime'], dissolve: ['Slime'], predator: ['Slime'], selfregeneration: ['Slime', 'Vampire'],
-  beastbody: ['Beastman', 'Direwolf'], beastdomination: ['Beastman'], beastunification: ['Beastman'], beastialize: ['Beastman'],
+  absorption: ['Slime', 'Demon Slime'], dissolve: ['Slime', 'Demon Slime'], predator: ['Slime', 'Demon Slime'], stomach: ['Slime', 'Demon Slime'], mimicry: ['Slime', 'Demon Slime'], selfregeneration: ['Slime', 'Demon Slime', 'Vampire'],
+  beastbody: ['Lycanthrope', 'Okami'], beastdomination: ['Lycanthrope'], beastunification: ['Lycanthrope'], beastialize: ['Lycanthrope'],
   bloodraise: ['Vampire'], darknightcycle: ['Vampire'], possess: ['Vampire'], charm: ['Vampire'],
   dragonbody: ['True Dragon'], dragonchange: ['True Dragon'], dragoneye: ['True Dragon'], dragonscales: ['True Dragon'], dragonskin: ['True Dragon'], dragonspirithaki: ['True Dragon'],
-  magicnullification: ['True Giant'], pseudodragonbody: ['Dragonewt'], scalearmor: ['Dragonewt'], flamebreath: ['Dragonewt'], thunderbreath: ['Dragonewt'],
-  ultrasmell: ['Direwolf'], shadowmotion: ['Direwolf', 'Vampire'], godwolfsense: ['Direwolf'],
+  magicnullification: ['True Giant'], pseudodragonbody: ['Dragonewt'], scalearmor: ['Lizardman', 'Dragonewt', 'True Dragonewt'], flamebreath: ['Dragon', 'Dragonewt', 'True Dragonewt'], thunderbreath: ['Dragon', 'Dragonewt', 'True Dragonewt'],
+  ultrasmell: ['Okami'], shadowmotion: ['Okami', 'Vampire'], godwolfsense: ['Okami'],
   ogreberserker: ['Ogre', 'Kijin'], blackflamethunder: ['Ogre', 'Kijin'],
-  plantwhisper: ['Spirit'], universalthread: ['Insectar'], stickythread: ['Insectar'], steelthread: ['Insectar'],
+  dangerdetection: ['Rabbitfolk'], plantwhisper: ['Treant', 'Dryad'], universalthread: ['Insectar'], stickythread: ['Insectar'], steelthread: ['Insectar'], stickysteelthread: ['Insectar'],
 };
 
 const skillKey = (name) => name.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -120,7 +125,9 @@ export async function weightedRoll({ milestone = false, boostLevel = 0, excluded
     !excluded.has(talent.name.toLowerCase())
       && (!rarity || talent.rarity === rarity)
       && talent.minTier <= characterTier
-      && (talent.races.length === 0 || talent.races.some((allowedRace) => raceKey(allowedRace) === characterRace)),
+      && (talent.races.length === 0
+        || characterRace === raceKey('Cryptid (Chimera)')
+        || talent.races.some((allowedRace) => raceKey(allowedRace) === characterRace)),
   ).map((talent) => ({
     ...talent,
     weight: adjustedWeight(talent, milestone, boostLevel),
