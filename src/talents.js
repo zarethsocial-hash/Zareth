@@ -26,7 +26,39 @@ export const DEFAULT_RACES = [
   'Cryptid (Chimera)',
 ];
 
-const defaultMinTier = { common: 1, uncommon: 2, rare: 3, epic: 4, legendary: 5 };
+// Tier 1 is intentionally a mix of Common Skills and the gentler Extra Skills.
+// Tier 2 introduces Intrinsic Skills. The advanced Extra Skills below are held
+// back until Tier 3, so an "Extra" label alone does not make a skill beginner-safe.
+const defaultMinTier = { common: 1, uncommon: 1, rare: 2, epic: 4, legendary: 5 };
+const advancedExtraSkillKeys = new Set([
+  'allseeingeye', 'thoughtacceleration', 'parallelcalculation', 'predictivecalculation', 'universalperception',
+  'chantannulment', 'blackflame', 'blacklightning', 'gravitymanipulation', 'spatialmotion', 'shadowmotion',
+  'multilayerbarrier', 'lifedrain', 'allofcreation', 'blackthunder', 'celestialeye', 'demonlordshaki',
+  'divinestrength', 'explosiveflames', 'flamedomination', 'futureattackprediction', 'godwolfsense',
+  'gravitydomination', 'heavenlyeye', 'heroshaki', 'holyhaki', 'holydemonicinversion', 'infiniteregeneration',
+  'lawdomination', 'lawmanipulation', 'mentalcrush', 'molecularmanipulation', 'multidimensionalbarrier',
+  'parallelexistence', 'parallelthought', 'quantummanipulation', 'spacetimedomination', 'spacetimemanipulation',
+  'spatialdomination', 'spatialmanipulation', 'spiritualdomination', 'spiritualmanipulation',
+  'temporalmanipulation', 'thougdomination', 'thoughtdomination', 'ultraacceleration', 'ultraintuition',
+  'ultrarecovery', 'ultraspeedaction', 'ultraspeedreaction', 'ultraspeedregeneration', 'ultraspeedthought',
+  'weatherdomination', 'actionalteration', 'attributeconversion', 'calculationdomain', 'charmdomination',
+  'controlheart', 'deceaseddomination', 'deephypno', 'fantasydestruction', 'foodchain', 'imaginaryspace',
+  'instakill', 'lightandheatdomination', 'nihilitycollapse', 'nihilitycounter', 'organicdomination',
+  'powerabsorption', 'predation', 'probabilitymanipulation', 'protectionconferment', 'punitivedomination',
+  'skillcreation', 'skillduplication', 'skillgifting', 'skillsteal', 'soulconsumption', 'soulgluttony',
+  'spatialsuppression', 'timleap', 'timeleap', 'universalbarrier', 'willcontrol',
+]);
+
+function resolvedMinTier(talent) {
+  const key = skillKey(talent.name);
+  // Earlier generated pool records used uncommon=2 / rare=3. Rebalance those
+  // legacy defaults without touching deliberate higher/lower admin settings.
+  if (talent.rarity === 'uncommon' && (talent.minTier === undefined || Number(talent.minTier) === 2)) {
+    return advancedExtraSkillKeys.has(key) ? 3 : 1;
+  }
+  if (talent.rarity === 'rare' && (talent.minTier === undefined || Number(talent.minTier) === 3)) return 2;
+  return Number(talent.minTier) || defaultMinTier[talent.rarity] || 1;
+}
 const raceSkillRequirements = {
   absorption: ['Slime', 'Demon Slime'], dissolve: ['Slime', 'Demon Slime'], predator: ['Slime', 'Demon Slime'], stomach: ['Slime', 'Demon Slime'], mimicry: ['Slime', 'Demon Slime'], selfregeneration: ['Slime', 'Demon Slime', 'Vampire'],
   beastbody: ['Lycanthrope', 'Okami'], beastdomination: ['Lycanthrope'], beastunification: ['Lycanthrope'], beastialize: ['Lycanthrope'],
@@ -79,7 +111,7 @@ export async function getTalents() {
   return talents.map((talent) => ({
     ...talent,
     category: talent.category ?? defaultCategories[talent.name] ?? 'Innate',
-    minTier: Math.max(1, Math.min(5, Number(talent.minTier) || defaultMinTier[talent.rarity] || 1)),
+    minTier: Math.max(1, Math.min(5, resolvedMinTier(talent))),
     races: Array.isArray(talent.races) ? talent.races : (raceSkillRequirements[skillKey(talent.name)] ?? []),
   }));
 }
